@@ -29,6 +29,11 @@ class PrivateChannel extends Channel {
     if (!client.connected ||
         (subscribed && !force) ||
         client.socketId == null) {
+      options.log(
+        "SUBSCRIBE_SKIPPED",
+        name,
+        "connected: ${client.connected}, subscribed: $subscribed, socketId: ${client.socketId}",
+      );
       return;
     }
 
@@ -36,50 +41,95 @@ class PrivateChannel extends Channel {
 
     options.log("SUBSCRIBE", name);
 
-    final payload = {
-      "channel_name": name,
-      "socket_id": client.socketId,
-    };
-
-    final response = await http.post(
-      Uri.parse(authOptions.endpoint),
-      body: payload,
-      headers: await authOptions.headers(),
-    );
-
+    // Enhanced logging for authorization flow
     options.log(
-      "AUTH_RESPONSE",
+      "AUTH_START",
       name,
-      "options: $authOptions\n  payload: $payload\n  response: ${response.body}",
+      "🔐 Starting authorization\n"
+      "  Channel: $name\n"
+      "  Socket ID: ${client.socketId}\n"
+      "  Endpoint: ${authOptions.endpoint}",
     );
 
-    if (response.statusCode == 200) {
-      // try {
-      final data = jsonDecode(response.body);
+    try {
+      // FIXED: Send socket_id and channel_name as query parameters instead of body
+      final uri = Uri.parse(authOptions.endpoint).replace(queryParameters: {
+        "channel_name": name,
+        "socket_id": client.socketId!,
+      });
 
-      if (data is! Map) {
-        throw Exception(
-          "Invalid auth response data [$data], excepted Map got ${data.runtimeType}",
+      final headers = await authOptions.headers();
+
+      options.log(
+        "AUTH_REQUEST",
+        name,
+        "🔐 Making auth request\n"
+        "  URL: $uri\n"
+        "  Headers: $headers",
+      );
+
+      final response = await http.post(
+        uri,
+        headers: headers,
+      );
+
+      options.log(
+        "AUTH_RESPONSE",
+        name,
+        "🔐 Auth response received\n"
+        "  Status: ${response.statusCode}\n"
+        "  Body: ${response.body}",
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data is! Map) {
+          throw Exception(
+            "Invalid auth response data [$data], expected Map got ${data.runtimeType}",
+          );
+        } else if (!data.containsKey("auth")) {
+          throw Exception(
+            "Invalid auth response data [$data], auth key is missing",
+          );
+        }
+
+        authData = AuthData.fromJson(data);
+        userId = authData!.channelData?.userId;
+
+        options.log(
+          "AUTH_SUCCESS",
+          name,
+          "✅ Authorization successful\n"
+          "  Auth: ${authData!.auth}\n"
+          "  User ID: $userId",
         );
-      } else if (!data.containsKey("auth")) {
-        throw Exception(
-          "Invalid auth response data [$data], auth key is missing",
+
+        client.sendEvent("pusher:subscribe", {
+          "channel": name,
+          "auth": authData!.auth,
+          "channel_data": authData!.channelData?.toJsonString(),
+        });
+      } else {
+        final errorMessage = "Unable to authenticate channel $name\n"
+            "  Status code: ${response.statusCode}\n"
+            "  Response: ${response.body}";
+
+        options.log("AUTH_ERROR", name, "❌ $errorMessage");
+
+        handleEvent(
+          "pusher:error",
+          errorMessage,
         );
       }
-      authData = AuthData.fromJson(data);
-      userId = authData!.channelData?.userId;
-      client.sendEvent("pusher:subscribe", {
-        "channel": name,
-        "auth": authData!.auth,
-        "channel_data": authData!.channelData?.toJsonString(),
-      });
-      // } catch (e) {
-      //   handleEvent("pusher:error", e);
-      // }
-    } else {
+    } catch (e) {
+      final errorMessage = "Authorization exception for channel $name: $e";
+
+      options.log("AUTH_EXCEPTION", name, "❌ $errorMessage");
+
       handleEvent(
         "pusher:error",
-        "Unable to authenticate channel $name, status code: ${response.statusCode}",
+        errorMessage,
       );
     }
   }
