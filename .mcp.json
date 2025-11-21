@@ -1,0 +1,28 @@
+{
+    "mcpServers": {
+        "sequential-thinking": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+        },
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+        },
+        "memory-bank": {
+            "command": "npx",
+            "args": ["-y", "@allpepper/memory-bank-mcp"],
+            "env": {
+                "MEMORY_BANK_ROOT": "/Users/andy/Documents/PuzzleParty/memory-bank"
+            }
+        },
+        "herd": {
+            "command": "php",
+            "args": [
+                "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "/Users/andy/Documents/PuzzleParty/puzzleparty-project/puzzleparty-api"
+            }
+        }
+    }
+}
