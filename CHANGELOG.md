@@ -1,3 +1,11 @@
+## 0.0.8 - 2025-11-21
+
+- **CRITICAL FIX**: Fixed private and presence channel authorization to properly send `socket_id` and `channel_name` as query parameters instead of body parameters
+- Added enhanced logging with emoji indicators for authorization flow debugging
+- Improved error handling with detailed error messages including response status and body
+- Fixed compatibility with Laravel Reverb, Laravel Sanctum, and standard Pusher protocol
+- Added comprehensive try-catch error handling for authorization requests
+
 ## 0.0.7 - 2025-11-13
 
 - Merge [Refactor PusherOptions to improve URI construction and logging format](https://github.com/AbdoPrDZ/pusher_client_socket/pull/6) pull request.
